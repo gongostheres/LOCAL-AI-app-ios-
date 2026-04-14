@@ -133,9 +133,12 @@ final class ChatViewModel {
                     systemPrompt: systemPrompt,
                     onToken: { [weak self] chunk in
                         full += chunk
+                        // Fix: check/set firstToken here (background side) before dispatching
+                        // to MainActor, avoiding a data race between concurrent inner Tasks
+                        let isFirst = firstToken
+                        if firstToken { firstToken = false }
                         Task { @MainActor [weak self] in
-                            if firstToken {
-                                firstToken = false
+                            if isFirst {
                                 self?.isModelLoading = false
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             }
@@ -150,7 +153,7 @@ final class ChatViewModel {
                 await commit(full, speed: lastSpeed, to: convId)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
             } catch is CancellationError {
-                // stopGeneration() already handled commit
+                return // stopGeneration() already committed partial + called finishGenerating()
             } catch {
                 await setError(error.localizedDescription)
             }

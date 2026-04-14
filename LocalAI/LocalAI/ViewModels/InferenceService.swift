@@ -10,9 +10,16 @@ final class InferenceService: @unchecked Sendable {
     private var loadedModelId: String?
     private var activeSession: ChatSession?
     private var activeConversationId: UUID?
-    private let lock = NSLock()
+    // os_unfair_lock is safe across async/await (no thread pinning, non-blocking)
+    private var _lock = os_unfair_lock()
 
     private init() {}
+
+    private func withLock<T>(_ body: () throws -> T) rethrows -> T {
+        os_unfair_lock_lock(&_lock)
+        defer { os_unfair_lock_unlock(&_lock) }
+        return try body()
+    }
 
     // MARK: - Session Management
 
@@ -22,23 +29,23 @@ final class InferenceService: @unchecked Sendable {
         systemPrompt: String
     ) async throws {
         let container = try await loadContainer(for: model)
-        lock.lock()
-        if activeConversationId != conversationId || activeSession == nil {
-            activeSession = ChatSession(
-                container,
-                instructions: systemPrompt,
-                generateParameters: GenerateParameters(temperature: 0.7, topP: 0.9)
-            )
-            activeConversationId = conversationId
+        withLock {
+            if activeConversationId != conversationId || activeSession == nil {
+                activeSession = ChatSession(
+                    container,
+                    instructions: systemPrompt,
+                    generateParameters: GenerateParameters(temperature: 0.7, topP: 0.9)
+                )
+                activeConversationId = conversationId
+            }
         }
-        lock.unlock()
     }
 
     func invalidateSession() {
-        lock.lock()
-        activeSession = nil
-        activeConversationId = nil
-        lock.unlock()
+        withLock {
+            activeSession = nil
+            activeConversationId = nil
+        }
     }
 
     // MARK: - Streaming generation
@@ -53,12 +60,10 @@ final class InferenceService: @unchecked Sendable {
     ) async throws {
         try await prepareSession(for: model, conversationId: conversationId, systemPrompt: systemPrompt)
 
-        lock.lock()
-        guard let session = activeSession else {
-            lock.unlock()
-            throw InferenceError.noSession
+        let session = try withLock {
+            guard let s = activeSession else { throw InferenceError.noSession }
+            return s
         }
-        lock.unlock()
 
         let start = Date()
         var charCount = 0
@@ -89,25 +94,21 @@ final class InferenceService: @unchecked Sendable {
                 }
             )
         } catch {
-            let msg = error.localizedDescription.lowercased()
-            if msg.contains("memory") || msg.contains("allocation") || msg.contains("killed") {
-                throw InferenceError.outOfMemory
-            }
-            throw error
+            throw InferenceService.classifyError(error)
         }
     }
 
     // MARK: - Evict
 
     func evictModel(_ model: AIModel) {
-        lock.lock()
-        if loadedModelId == model.id {
-            loadedContainer = nil
-            loadedModelId = nil
-            activeSession = nil
-            activeConversationId = nil
+        withLock {
+            if loadedModelId == model.id {
+                loadedContainer = nil
+                loadedModelId = nil
+                activeSession = nil
+                activeConversationId = nil
+            }
         }
-        lock.unlock()
         let url = FileManager.default
             .urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("huggingface/models/\(model.id.replacingOccurrences(of: "/", with: "--"))")
@@ -117,29 +118,40 @@ final class InferenceService: @unchecked Sendable {
     // MARK: - Private
 
     private func loadContainer(for model: AIModel) async throws -> ModelContainer {
-        lock.lock()
-        if loadedModelId == model.id, let c = loadedContainer {
-            lock.unlock()
-            return c
+        if let cached = withLock({ loadedModelId == model.id ? loadedContainer : nil }) {
+            return cached
         }
-        lock.unlock()
         do {
             let container = try await LLMModelFactory.shared.loadContainer(
                 configuration: ModelConfiguration(id: model.id),
                 progressHandler: { _ in }
             )
-            lock.lock()
-            loadedContainer = container
-            loadedModelId = model.id
-            lock.unlock()
+            withLock {
+                loadedContainer = container
+                loadedModelId = model.id
+            }
             return container
         } catch {
-            let msg = error.localizedDescription.lowercased()
-            if msg.contains("memory") || msg.contains("allocation") || msg.contains("killed") {
-                throw InferenceError.outOfMemory
-            }
-            throw error
+            throw InferenceService.classifyError(error)
         }
+    }
+
+    /// Converts low-level errors to InferenceError.outOfMemory when appropriate.
+    /// Checks POSIX error codes first (locale-independent), then falls back to
+    /// English + Russian keyword matching in the localised description.
+    private static func classifyError(_ error: Error) -> Error {
+        let ns = error as NSError
+        let isMemoryPressure =
+            ns.domain == NSPOSIXErrorDomain && (ns.code == Int(ENOMEM) || ns.code == Int(EINVAL))
+            || ns.code == Int(ENOMEM)
+        if isMemoryPressure { return InferenceError.outOfMemory }
+
+        let msg = ns.localizedDescription.lowercased()
+        let keywords = ["memory", "allocation", "killed", "out of memory",
+                        "память", "выделение", "нехватка"]
+        if keywords.contains(where: msg.contains) { return InferenceError.outOfMemory }
+
+        return error
     }
 }
 

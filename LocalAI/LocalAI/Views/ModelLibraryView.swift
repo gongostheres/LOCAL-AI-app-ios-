@@ -65,7 +65,11 @@ struct ModelLibraryView: View {
         .task {
             while !Task.isCancelled {
                 freeRAMGB = Double(os_proc_available_memory()) / 1_073_741_824
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                do {
+                    try await Task.sleep(nanoseconds: 3_000_000_000)
+                } catch {
+                    break // cancelled — exit cleanly
+                }
             }
         }
     }
