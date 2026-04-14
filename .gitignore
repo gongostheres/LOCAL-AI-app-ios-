@@ -1,0 +1,28 @@
+# Xcode
+*.xcuserstate
+xcuserdata/
+DerivedData/
+*.xccheckout
+*.moved-aside
+*.pbxuser
+
+# Build
+build/
+*.ipa
+*.xcarchive
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# SPM
+.build/
+SourcePackages/
+
+# Misc
+*.orig
+*.log
+.wolf/
+.claude/
+CLAUDE.md

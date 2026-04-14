@@ -1,0 +1,57 @@
+name: LocalAI
+
+options:
+  bundleIdPrefix: com.gostheres
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+packages:
+  mlx-swift-lm:
+    url: https://github.com/ml-explore/mlx-swift-lm
+    from: "2.0.0"
+
+targets:
+  LocalAI:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: LocalAI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.gostheres.LocalAI
+        DEVELOPMENT_TEAM: ACMTJ266DY
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Apple Development"
+        PROVISIONING_PROFILE_SPECIFIER: ""
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        INFOPLIST_FILE: LocalAI/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_HARDENED_RUNTIME: NO
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+    dependencies:
+      - package: mlx-swift-lm
+        product: MLXLLM
+      - package: mlx-swift-lm
+        product: MLXLMCommon
+    entitlements:
+      path: LocalAI/LocalAI.entitlements
+      properties:
+        com.apple.security.network.client: true
+        com.apple.developer.kernel.increased-memory-limit: true
+
+schemes:
+  LocalAI:
+    build:
+      targets:
+        LocalAI: all
+    run:
+      config: Debug
+    archive:
+      config: Release
