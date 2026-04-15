@@ -33,19 +33,20 @@ final class ModelLibraryViewModel {
 
         Task {
             do {
-                try await InferenceService.shared.preloadModel(model) { [weak self] completed, total in
+                try await InferenceService.shared.preloadModel(model) { [weak self] completed, total, fileFraction in
                     Task { @MainActor [weak self] in
                         guard let self else { return }
 
-                        // First byte received — leave connecting state
+                        // First callback — leave connecting state
                         if self.connectingIds.contains(model.id) {
                             self.connectingIds.remove(model.id)
                         }
 
-                        // Accurate fraction from file count
+                        // Smooth progress: completed files + byte-fraction of current file
+                        // Prevents "frozen" bar while a large shard is mid-download
                         let fraction: Double
                         if total > 0 {
-                            fraction = Double(completed) / Double(total)
+                            fraction = min((Double(completed) + fileFraction) / Double(total), 1.0)
                         } else {
                             fraction = 0
                         }

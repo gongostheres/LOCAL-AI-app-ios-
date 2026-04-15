@@ -84,13 +84,14 @@ final class InferenceService: @unchecked Sendable {
 
     func preloadModel(
         _ model: AIModel,
-        onProgress: @escaping (_ completed: Int64, _ total: Int64) -> Void
+        onProgress: @escaping (_ completed: Int64, _ total: Int64, _ fileFraction: Double) -> Void
     ) async throws {
         do {
             _ = try await LLMModelFactory.shared.loadContainer(
                 configuration: ModelConfiguration(id: model.id),
                 progressHandler: { progress in
-                    onProgress(progress.completedUnitCount, progress.totalUnitCount)
+                    // fileFraction = byte-level progress within the current file (0→1)
+                    onProgress(progress.completedUnitCount, progress.totalUnitCount, progress.fractionCompleted)
                 }
             )
         } catch {

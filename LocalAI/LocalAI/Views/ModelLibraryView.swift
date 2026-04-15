@@ -356,14 +356,20 @@ struct ModelCard: View {
             HStack(spacing: 12) {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.06)).frame(height: 4)
+                        // Track
+                        Capsule()
+                            .fill(Color.white.opacity(0.06))
+                            .frame(height: 5)
+                        // Fill — smooth animation even for small increments
                         Capsule()
                             .fill(model.color1)
-                            .frame(width: geo.size.width * p, height: 4)
-                            .animation(.easeOut(duration: 0.4), value: p)
+                            .frame(width: max(geo.size.width * p, 8), height: 5)
+                            .animation(.easeOut(duration: 0.6), value: p)
+                            // Shimmer shows download is active even when % barely moves
+                            .shimmer()
                     }
                 }
-                .frame(height: 4)
+                .frame(height: 5)
                 Text(String(format: "%.0f%%", p * 100))
                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
                     .foregroundStyle(model.color1)
