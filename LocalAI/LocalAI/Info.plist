@@ -22,6 +22,10 @@
     <true/>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Для загрузки AI-моделей при первом запуске</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Для голосового ввода сообщений</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Для распознавания речи и перевода голоса в текст</string>
     <key>UIApplicationSceneManifest</key>
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key>

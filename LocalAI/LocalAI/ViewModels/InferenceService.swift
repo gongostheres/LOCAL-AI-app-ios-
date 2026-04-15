@@ -34,7 +34,7 @@ final class InferenceService: @unchecked Sendable {
                 activeSession = ChatSession(
                     container,
                     instructions: systemPrompt,
-                    generateParameters: GenerateParameters(temperature: 0.7, topP: 0.9)
+                    generateParameters: GenerateParameters(temperature: 0.6, topP: 0.9)
                 )
                 activeConversationId = conversationId
             }

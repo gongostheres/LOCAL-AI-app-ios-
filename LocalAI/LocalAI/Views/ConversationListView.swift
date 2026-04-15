@@ -7,14 +7,23 @@ struct ConversationListView: View {
 
     @State private var renamingId: UUID?
     @State private var renameText: String = ""
+    @State private var searchText: String = ""
+
+    private var filteredConversations: [Conversation] {
+        if searchText.isEmpty { return vm.conversations }
+        return vm.conversations.filter {
+            $0.title.localizedCaseInsensitiveContains(searchText) ||
+            $0.preview.localizedCaseInsensitiveContains(searchText)
+        }
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                if vm.conversations.isEmpty {
+                if filteredConversations.isEmpty {
                     emptyState
                 } else {
-                    ForEach(vm.conversations) { conv in
+                    ForEach(filteredConversations) { conv in
                         ConversationRow(
                             conv: conv,
                             isActive: vm.currentConversation?.id == conv.id,
@@ -36,6 +45,7 @@ struct ConversationListView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .searchable(text: $searchText, prompt: "Поиск по диалогам")
             .navigationTitle("История")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -53,12 +63,12 @@ struct ConversationListView: View {
 
     private var emptyState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "bubble.left.and.bubble.right")
+            Image(systemName: searchText.isEmpty ? "bubble.left.and.bubble.right" : "magnifyingglass")
                 .font(.system(size: 44))
                 .foregroundStyle(.secondary)
-            Text("Нет истории чатов")
+            Text(searchText.isEmpty ? "Нет истории чатов" : "Ничего не найдено")
                 .font(.headline)
-            Text("Выберите модель и начните разговор")
+            Text(searchText.isEmpty ? "Выберите модель и начните разговор" : "Попробуйте другой запрос")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
